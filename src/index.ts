@@ -42,10 +42,24 @@ export default {
       const placeholderPattern = /{([^}]+)}/;
       const metaDataEndpointWithId = metaDataEndpoint.replace(placeholderPattern, id);
     
-      // Fetch metadata from the API endpoint
-      const metaDataResponse = await fetch(metaDataEndpointWithId);
-      const metadata = await metaDataResponse.json();
-      return metadata;
+      console.log("Fetching metadata from:", metaDataEndpointWithId);
+      
+      try {
+        // Fetch metadata from the API endpoint
+        const metaDataResponse = await fetch(metaDataEndpointWithId);
+        
+        if (!metaDataResponse.ok) {
+          console.error("Metadata fetch failed:", metaDataResponse.status, await metaDataResponse.text());
+          return null;
+        }
+        
+        const metadata = await metaDataResponse.json();
+        console.log("Metadata received:", metadata);
+        return metadata;
+      } catch (error) {
+        console.error("Error fetching metadata:", error);
+        return null;
+      }
     }
 
     // Handle dynamic page requests
@@ -65,6 +79,12 @@ export default {
       });
 
       const metadata = await requestMetadata(url.pathname, patternConfig.metaDataEndpoint);
+      
+      if (!metadata) {
+        console.error("Failed to fetch metadata, returning original page");
+        return source;
+      }
+      
       console.log("Metadata fetched:", metadata);
 
       // Create a custom header handler with the fetched metadata
@@ -90,6 +110,14 @@ export default {
         const patternConfigForPageData = getPatternConfig(pathname);
         if (patternConfigForPageData) {
           const metadata = await requestMetadata(pathname, patternConfigForPageData.metaDataEndpoint);
+          
+          if (!metadata) {
+            console.error("Failed to fetch metadata for page data");
+            return new Response(JSON.stringify(sourceData), {
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          
           console.log("Metadata fetched:", metadata);
 
           // Ensure nested objects exist in the source data
@@ -169,13 +197,18 @@ class CustomHeaderHandler {
           element.setAttribute("content", this.metadata.image);
           break;
         case "keywords":
-          element.setAttribute("content", this.metadata.keywords);
+          if (this.metadata.keywords) {
+            element.setAttribute("content", this.metadata.keywords);
+          }
           break;
         case "twitter:title":
           element.setAttribute("content", this.metadata.title);
           break;
         case "twitter:description":
           element.setAttribute("content", this.metadata.description);
+          break;
+        case "twitter:image":
+          element.setAttribute("content", this.metadata.image);
           break;
       }
 
